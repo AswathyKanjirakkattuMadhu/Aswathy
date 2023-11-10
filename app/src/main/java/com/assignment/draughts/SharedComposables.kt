@@ -1,13 +1,13 @@
 package com.assignment.draughts
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -17,8 +17,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.assignment.draughts.Conditionals.Companion.isFirstSelection
 
 /*
 Entry point for UI
@@ -40,7 +44,6 @@ fun DraughtsGame() {
     var message by remember {
         mutableStateOf("Start with RED player")
     }
-    Log.d(TAG, "DraughtsGame: Col $selectedCol Row $selectedRow")
     val coins: Array<Array<Box>> by remember {
         mutableStateOf(
             Array(8) { row ->
@@ -65,88 +68,106 @@ fun DraughtsGame() {
             }
         )
     }
+    Log.d(TAG, "DraughtsGame: $selectedCol $selectedRow")
+    val context = LocalContext.current
     Column {
-        if (message.isNotBlank()) {
-            Text(text = message)
-        }
-        Column {
-            repeat(8) { col ->
-                Row {
-                    repeat(8) { row ->
-                        val box = coins[row][col]
-                        SingleBox(box) {
-                            message = ""
-                            if (box.coinColor != currentPlayer && isFirstSelection(selectedCol,selectedRow)) {
-                                message = "Wrong player selected"
-                                return@SingleBox
-                            }
-                            //Remember the selected row and col as the selection is the from box
-                            if (isFirstSelection(selectedCol, selectedRow)) {
-                                selectedRow = row
-                                selectedCol = col
-                                message = "Selected Col: $selectedCol Row: $selectedRow"
-                            } else {
-                                if ((row == selectedRow && col == selectedCol) || (box.backgroundColor != Color.Black)) {
-                                    //Same box selection
-                                    return@SingleBox
-                                } else if (box.isCoinPresent) {
-                                    //Proceed to move the coin as the selection is now to the target box
-                                    message = "Cannot move to filled boxes"
-                                } else {
-                                    //Ready to move the coin
-                                    //Check the coin is in black target
-                                    val selected = coins[selectedRow][selectedCol].coinColor
-                                    coins[selectedRow][selectedCol].coinColor = null
-                                    coins[selectedRow][selectedCol].isCoinPresent = false
-                                    coins[row][col].isCoinPresent = true
-                                    coins[row][col].coinColor = selected
-                                    //Reset the current selection and switch the player Side
-                                    selectedCol = -1
-                                    selectedRow = -1
-                                    currentPlayer =
-                                        if (currentPlayer == Color.Red) Color.Green else Color.Red
-                                    message = "Player $currentPlayer turn"
-                                }
-                                message =
-                                    "Selected to move from Col: $selectedCol Row: $selectedRow to Col: $col Row: $row"
-                            }
-
-                            Log.d(TAG, "DraughtsGame: Col $selectedCol Row $selectedRow")
-
-                        }
-                    }
+        Text(text = message)
+        GameBoxesCanvas(coins) { col, row ->
+            message = "Clicked $row $col"
+            Toast.makeText(
+                context,
+                "`Clicked` $col $row ${coins[col][row].isCoinPresent}",
+                Toast.LENGTH_SHORT
+            ).show()
+            Log.d(TAG, "DraughtsGame: $selectedCol $selectedRow")
+            if (isFirstSelection(selectedCol, selectedRow)) {
+                if (!coins[col][row].isCoinPresent) {
+                    message = "No coin to move"
+                } else if (coins[col][row].coinColor != currentPlayer) {
+                    message = "Wrong player"
+                } else {
+                    selectedCol = col
+                    selectedRow = row
+                    message = "Select target box"
                 }
+                return@GameBoxesCanvas
+            }
+            Log.d(TAG, "DraughtsGame: Is Black  = ${(col + row) % 2}")
+            if ((col + row) % 2 == 0) {
+                return@GameBoxesCanvas
+            }
+
+            val selected = coins[selectedCol][selectedRow].coinColor
+            coins[selectedCol][selectedRow].coinColor = null
+            coins[selectedCol][selectedRow].isCoinPresent = false
+            coins[col][row].isCoinPresent = true
+            coins[col][row].coinColor = selected
+            //Reset the current selection and switch the player Side
+            selectedCol = -1
+            selectedRow = -1
+            currentPlayer = if (currentPlayer == Color.Red) {
+                message = "Current Player : Green"
+                Color.Green
+            } else {
+                message = "Current Player : Red"
+                Color.Red
             }
         }
     }
 }
 
-private fun isFirstSelection(selectedCol: Int, selectedRow: Int) =
-    selectedCol == -1 && selectedRow == -1
-
+private fun isValidMove(currentPlayer: Color, selectedCol: Int, col: Int): Boolean {
+    if (currentPlayer == Color.Red && selectedCol > col) {
+        //Allow movement to top only if the player is red
+        return false
+    } else if (selectedCol < col) {
+        return false
+    }
+    return true
+}
 
 @Composable
-fun SingleBox(
-    boxData: Box,
-    clickAction: () -> Unit
-) {
-    Log.d(TAG, "SingleBox: ${boxData.isCoinPresent} ${boxData.coinColor == Color.Red}")
-    Box(
+fun GameBoxesCanvas(coins: Array<Array<Box>>, onCoinClick: (Int, Int) -> Unit) {
+    var canvasSize by remember { mutableStateOf(Offset(0f, 0f)) }
+
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    Canvas(
         modifier = Modifier
-            .background(boxData.backgroundColor)
-            .size(40.dp)
-            .clickable {
-                clickAction()
+            .width(screenWidth)
+            .height(screenWidth)
+            .background(Color.Gray)
+            .pointerInput(Unit) {
+                detectTapGestures { pan ->
+                    val column = (pan.x / (size.width / 8)).toInt()
+                    val row = (pan.y / (size.height / 8)).toInt()
+                    onCoinClick(column, row)
+                }
             }
     ) {
-        if (boxData.isCoinPresent) {
-            Canvas(modifier = Modifier.matchParentSize()) {
-                boxData.coinColor?.let {
-                    drawCircle(
-                        it,
-                        center = Offset(size.width / 2, size.height / 2),
-                        radius = size.width / 3
-                    )
+        val canvasWidth = size.width
+        val squareSize = canvasWidth / 8f
+
+        for (i in 0 until 8) {
+            for (j in 0 until 8) {
+                val x = i * squareSize
+                val y = j * squareSize
+                val squareColor = if ((i + j) % 2 == 0) Color.White else Color.Black
+
+                drawRect(
+                    color = squareColor,
+                    topLeft = Offset(x, y),
+                    size = androidx.compose.ui.geometry.Size(squareSize, squareSize)
+                )
+
+                if (coins[i][j].isCoinPresent) {
+                    coins[i][j].coinColor?.let {
+                        drawCircle(
+                            it,
+                            center = Offset(x + squareSize / 2, y + squareSize / 2),
+                            radius = squareSize / 3,
+                        )
+                    }
                 }
             }
         }
