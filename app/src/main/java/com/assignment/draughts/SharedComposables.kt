@@ -1,7 +1,6 @@
 package com.assignment.draughts
 
 import android.util.Log
-import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -68,18 +67,13 @@ fun DraughtsGame() {
             }
         )
     }
-    Log.d(TAG, "DraughtsGame: $selectedCol $selectedRow")
-    val context = LocalContext.current
+
     Column {
         Text(text = message)
         GameBoxesCanvas(coins) { col, row ->
-            message = "Clicked $row $col"
-            Toast.makeText(
-                context,
-                "`Clicked` $col $row ${coins[col][row].isCoinPresent}",
-                Toast.LENGTH_SHORT
-            ).show()
-            Log.d(TAG, "DraughtsGame: $selectedCol $selectedRow")
+            message = "Selected $row $col"
+            Log.d(TAG, "DraughtsGame: Selected Col $selectedCol Selected Row $selectedRow")
+            Log.d(TAG, "DraughtsGame: Target Col $col Target Row $row")
             if (isFirstSelection(selectedCol, selectedRow)) {
                 if (!coins[col][row].isCoinPresent) {
                     message = "No coin to move"
@@ -92,38 +86,139 @@ fun DraughtsGame() {
                 }
                 return@GameBoxesCanvas
             }
-            Log.d(TAG, "DraughtsGame: Is Black  = ${(col + row) % 2}")
+
             if ((col + row) % 2 == 0) {
+                message = "Can only move to blacks!"
                 return@GameBoxesCanvas
             }
 
-            val selected = coins[selectedCol][selectedRow].coinColor
-            coins[selectedCol][selectedRow].coinColor = null
-            coins[selectedCol][selectedRow].isCoinPresent = false
-            coins[col][row].isCoinPresent = true
-            coins[col][row].coinColor = selected
-            //Reset the current selection and switch the player Side
-            selectedCol = -1
-            selectedRow = -1
-            currentPlayer = if (currentPlayer == Color.Red) {
-                message = "Current Player : Green"
-                Color.Green
-            } else {
-                message = "Current Player : Red"
-                Color.Red
+
+            var shouldMove = false
+
+            if (currentPlayer == Color.Red) {
+                if (!coins[col][row].isCoinPresent) {
+                    if (isValidMove(currentPlayer, selectedRow, row)) {
+                        shouldMove = true
+                    }
+                }
+                if (selectedCol - 1 == col && selectedRow - 1 == row) {
+                    //trying to move left diagonal
+                    if (coins[selectedCol - 1][selectedRow - 1].isCoinPresent) {
+                        message = "Already occupied"
+                        //Deny the move
+                        return@GameBoxesCanvas
+                    }
+                }
+                if (selectedCol + 1 == col && selectedRow + 1 == row) {
+                    //trying to move left diagonal
+                    if (coins[selectedCol - 1][selectedRow - 1].isCoinPresent) {
+                        message = "Already occupied"
+                        //Deny the move
+                        return@GameBoxesCanvas
+                    }
+                }
+                if (selectedCol - 2 == col && selectedRow - 2 == row) {
+                    //Trying to cross left diagonal coin
+                    if (coins[selectedCol - 1][selectedRow - 1].isCoinPresent) {
+                        //There is a coin present in between
+                        if (coins[selectedCol - 1][selectedRow - 1].coinColor == Color.Green) {
+                            //The coin in between is green
+                            //Remove the green coin
+                            coins[selectedCol - 1][selectedRow - 1].coinColor = null
+                            coins[selectedCol - 1][selectedRow - 1].isCoinPresent = false
+                            //Proceed to move the coin
+                            shouldMove = true
+                        }
+                    }
+                }
+                if (selectedCol + 2 == col && selectedRow - 2 == row) {
+                    //Trying to cross left diagonal coin
+                    if (coins[selectedCol + 1][selectedRow - 1].isCoinPresent) {
+                        //There is a coin present in between
+                        if (coins[selectedCol + 1][selectedRow - 1].coinColor == Color.Green) {
+                            //The coin in between is green
+                            //Remove the green coin
+                            coins[selectedCol + 1][selectedRow - 1].coinColor = null
+                            coins[selectedCol + 1][selectedRow - 1].isCoinPresent = false
+                            //Proceed to move the coin
+                            shouldMove = true
+                        }
+                    }
+                }
+            }
+
+            if (currentPlayer == Color.Green) {
+                if (!coins[col][row].isCoinPresent) {
+                    if (isValidMove(currentPlayer, selectedRow, row)) {
+                        Log.d(TAG, "DraughtsGame: Valid green move ")
+                        shouldMove = true
+                    }
+                }
+                if (selectedCol + 1 == col && selectedRow + 1 == row) {
+                    //trying to move left diagonal
+                    if (coins[selectedCol + 1][selectedRow + 1].isCoinPresent) {
+                        message = "Already occupied"
+                        //Deny the move
+                        return@GameBoxesCanvas
+                    }
+                }
+                if (selectedCol - 2 == col && selectedRow + 2 == row) {
+                    //Trying to cross bottom right diagonal coin
+                    if (coins[selectedCol - 1][selectedRow + 1].isCoinPresent) {
+                        //There is a coin present in between
+                        if (coins[selectedCol - 1][selectedRow + 1].coinColor == Color.Red) {
+                            //The coin in between is red
+                            //Remove the green coin
+                            coins[selectedCol - 1][selectedRow + 1].coinColor = null
+                            coins[selectedCol - 1][selectedRow + 1].isCoinPresent = false
+                            //Proceed to move the coin
+                            shouldMove = true
+                        }
+                    }
+                }
+                if (selectedCol + 2 == col && selectedRow + 2 == row) {
+                    //Trying to cross left diagonal coin
+                    if (coins[selectedCol + 1][selectedRow + 1].isCoinPresent) {
+                        //There is a coin present in between
+                        if (coins[selectedCol + 1][selectedRow + 1].coinColor == Color.Red) {
+                            //The coin in between is red
+                            //Remove the green coin
+                            coins[selectedCol + 1][selectedRow + 1].coinColor = null
+                            coins[selectedCol + 1][selectedRow + 1].isCoinPresent = false
+                            //Proceed to move the coin
+                            shouldMove = true
+                        }
+                    }
+                }
+            }
+
+            if (shouldMove) {
+                val selected = coins[selectedCol][selectedRow].coinColor
+                coins[selectedCol][selectedRow].coinColor = null
+                coins[selectedCol][selectedRow].isCoinPresent = false
+                coins[col][row].isCoinPresent = true
+                coins[col][row].coinColor = selected
+                //Reset the current selection and switch the player Side
+                selectedCol = -1
+                selectedRow = -1
+                currentPlayer = if (currentPlayer == Color.Red) {
+                    message = "Current Player : Green"
+                    Color.Green
+                } else {
+                    message = "Current Player : Red"
+                    Color.Red
+                }
             }
         }
     }
 }
 
-private fun isValidMove(currentPlayer: Color, selectedCol: Int, col: Int): Boolean {
-    if (currentPlayer == Color.Red && selectedCol > col) {
+private fun isValidMove(currentPlayer: Color, selRow: Int, tarRow: Int): Boolean {
+    if (currentPlayer == Color.Red) {
         //Allow movement to top only if the player is red
-        return false
-    } else if (selectedCol < col) {
-        return false
+        return selRow > tarRow
     }
-    return true
+    return selRow < tarRow
 }
 
 @Composable
@@ -172,4 +267,5 @@ fun GameBoxesCanvas(coins: Array<Array<Box>>, onCoinClick: (Int, Int) -> Unit) {
             }
         }
     }
+
 }
