@@ -34,6 +34,7 @@ class Box {
     var backgroundColor: Color = Color.Black
     var isCoinPresent : Boolean = false
     var coinColor : Color? = null
+    var isKing : Boolean = false
 }
 /**
  * Holds the board information like where the coins are

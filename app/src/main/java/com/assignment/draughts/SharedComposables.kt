@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,7 +44,7 @@ fun DraughtsGame() {
     var message by remember {
         mutableStateOf("Start with RED player")
     }
-    val coins: Array<Array<Box>> by remember {
+    var coins: Array<Array<Box>> by remember {
         mutableStateOf(
             Array(8) { row ->
                 Array(8) { col ->
@@ -70,6 +71,33 @@ fun DraughtsGame() {
 
     Column {
         Text(text = message)
+        Button(onClick = {
+            selectedCol = -1
+            selectedRow = -1
+            coins = Array(8) { row ->
+                Array(8) { col ->
+                    val box = Box()
+                    box.apply {
+                        backgroundColor = if (((row + col) % 2) == 0) {
+                            Color.White
+                        } else {
+                            Color.Black
+                        }
+                        if (backgroundColor == Color.Black && col != 3 && col != 4) {
+                            isCoinPresent = true
+                            coinColor = if (col <= 3) {
+                                Color.Green
+                            } else {
+                                Color.Red
+                            }
+                        }
+                    }
+                }
+            }
+        }) {
+            Text(text = "Reset")
+        }
+
         GameBoxesCanvas(coins) { col, row ->
             message = "Selected $row $col"
             Log.d(TAG, "DraughtsGame: Selected Col $selectedCol Selected Row $selectedRow")
@@ -92,15 +120,19 @@ fun DraughtsGame() {
                 return@GameBoxesCanvas
             }
 
+            if (coins[selectedCol][selectedRow].isKing) {
+                //Kings will have different logic
+                return@GameBoxesCanvas
+            }
 
             var shouldMove = false
-
             if (currentPlayer == Color.Red) {
-                if (!coins[col][row].isCoinPresent) {
-                    if (isValidMove(currentPlayer, selectedRow, row)) {
-                        shouldMove = true
-                    }
+                if (!isValidRedMove(selectedRow, row, selectedCol, col)) {
+                    message = "Invalid move"
+                    return@GameBoxesCanvas
                 }
+
+                shouldMove = !coins[col][row].isCoinPresent
                 if (selectedCol - 1 == col && selectedRow - 1 == row) {
                     //trying to move left diagonal
                     if (coins[selectedCol - 1][selectedRow - 1].isCoinPresent) {
@@ -119,7 +151,7 @@ fun DraughtsGame() {
                 }
                 if (selectedCol - 2 == col && selectedRow - 2 == row) {
                     //Trying to cross left diagonal coin
-                    if (coins[selectedCol - 1][selectedRow - 1].isCoinPresent) {
+                    if (coins[selectedCol - 1][selectedRow - 1].isCoinPresent && !coins[col][row].isCoinPresent) {
                         //There is a coin present in between
                         if (coins[selectedCol - 1][selectedRow - 1].coinColor == Color.Green) {
                             //The coin in between is green
@@ -129,11 +161,14 @@ fun DraughtsGame() {
                             //Proceed to move the coin
                             shouldMove = true
                         }
+                    } else {
+                        message =
+                            "Cannot make move, either target is not empty or in between is not occupied"
                     }
                 }
                 if (selectedCol + 2 == col && selectedRow - 2 == row) {
                     //Trying to cross left diagonal coin
-                    if (coins[selectedCol + 1][selectedRow - 1].isCoinPresent) {
+                    if (coins[selectedCol + 1][selectedRow - 1].isCoinPresent && !coins[col][row].isCoinPresent) {
                         //There is a coin present in between
                         if (coins[selectedCol + 1][selectedRow - 1].coinColor == Color.Green) {
                             //The coin in between is green
@@ -143,7 +178,14 @@ fun DraughtsGame() {
                             //Proceed to move the coin
                             shouldMove = true
                         }
+                    } else {
+                        message =
+                            "Cannot make move, either target is not empty or in between is not occupied"
                     }
+                }
+                if (row == 0) {
+                    //King the red player as it has reached the top
+                    coins[col][row].isKing = true
                 }
             }
 
@@ -159,10 +201,10 @@ fun DraughtsGame() {
                     if (coins[selectedCol + 1][selectedRow + 1].isCoinPresent) {
                         message = "Already occupied"
                         //Deny the move
-                        return@GameBoxesCanvas
+                        shouldMove = false
                     }
                 }
-                if (selectedCol - 2 == col && selectedRow + 2 == row) {
+                if (selectedCol - 2 == col && selectedRow + 2 == row && !coins[col][row].isCoinPresent) {
                     //Trying to cross bottom right diagonal coin
                     if (coins[selectedCol - 1][selectedRow + 1].isCoinPresent) {
                         //There is a coin present in between
@@ -175,10 +217,13 @@ fun DraughtsGame() {
                             shouldMove = true
                         }
                     }
+                } else {
+                    message =
+                        "Cannot make move, either target is not empty or in between is not occupied"
                 }
-                if (selectedCol + 2 == col && selectedRow + 2 == row) {
+                if (selectedCol + 2 == col && selectedRow + 2 == row && !coins[col][row].isCoinPresent) {
                     //Trying to cross left diagonal coin
-                    if (coins[selectedCol + 1][selectedRow + 1].isCoinPresent) {
+                    if (coins[selectedCol + 1][selectedRow + 1].isCoinPresent && !coins[col][row].isCoinPresent) {
                         //There is a coin present in between
                         if (coins[selectedCol + 1][selectedRow + 1].coinColor == Color.Red) {
                             //The coin in between is red
@@ -189,16 +234,27 @@ fun DraughtsGame() {
                             shouldMove = true
                         }
                     }
+                } else {
+                    message =
+                        "Cannot make move, either target is not empty or in between is not occupied"
                 }
+
+                if (row == 7) {
+                    //King the green player as it has reached the bottom
+                    coins[col][row].isKing = true
+                }
+
             }
 
             if (shouldMove) {
+                //Reset the current selection and switch the player Side
+
                 val selected = coins[selectedCol][selectedRow].coinColor
                 coins[selectedCol][selectedRow].coinColor = null
                 coins[selectedCol][selectedRow].isCoinPresent = false
+
                 coins[col][row].isCoinPresent = true
                 coins[col][row].coinColor = selected
-                //Reset the current selection and switch the player Side
                 selectedCol = -1
                 selectedRow = -1
                 currentPlayer = if (currentPlayer == Color.Red) {
@@ -211,6 +267,13 @@ fun DraughtsGame() {
             }
         }
     }
+}
+
+fun isValidRedMove(selectedRow: Int, row: Int, selectedCol: Int, col: Int): Boolean {
+    return (selectedCol - 1 == col && selectedRow - 1 == row) ||
+            (selectedCol + 1 == col && selectedRow - 1 == row) ||
+            (selectedCol - 2 == col && selectedRow - 2 == row) ||
+            (selectedCol + 2 == col && selectedRow - 2 == row)
 }
 
 private fun isValidMove(currentPlayer: Color, selRow: Int, tarRow: Int): Boolean {
@@ -261,6 +324,13 @@ fun GameBoxesCanvas(coins: Array<Array<Box>>, onCoinClick: (Int, Int) -> Unit) {
                             it,
                             center = Offset(x + squareSize / 2, y + squareSize / 2),
                             radius = squareSize / 3,
+                        )
+                    }
+                    if (coins[i][j].isKing) {
+                        drawCircle(
+                            Color.DarkGray,
+                            center = Offset(x + squareSize / 2, y + squareSize / 2),
+                            radius = squareSize / 5,
                         )
                     }
                 }
