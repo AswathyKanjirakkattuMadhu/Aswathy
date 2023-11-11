@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,7 +20,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.assignment.draughts.Conditionals.Companion.isFirstSelection
@@ -44,6 +44,15 @@ fun DraughtsGame() {
     var message by remember {
         mutableStateOf("Start with RED player")
     }
+
+    var crossedReds by remember {
+        mutableStateOf(0)
+    }
+
+    var crossedGreens by remember {
+        mutableStateOf(0)
+    }
+
     var coins: Array<Array<Box>> by remember {
         mutableStateOf(
             Array(8) { row ->
@@ -72,6 +81,7 @@ fun DraughtsGame() {
     Column {
         Text(text = message)
         Button(onClick = {
+            currentPlayer = Color.Red
             selectedCol = -1
             selectedRow = -1
             coins = Array(8) { row ->
@@ -99,7 +109,9 @@ fun DraughtsGame() {
         }
 
         GameBoxesCanvas(coins) { col, row ->
-            message = "Selected $row $col"
+            message = "Selected $row $col, Please select target box"
+            var shouldMove = false
+
             Log.d(TAG, "DraughtsGame: Selected Col $selectedCol Selected Row $selectedRow")
             Log.d(TAG, "DraughtsGame: Target Col $col Target Row $row")
             if (isFirstSelection(selectedCol, selectedRow)) {
@@ -110,6 +122,7 @@ fun DraughtsGame() {
                 } else {
                     selectedCol = col
                     selectedRow = row
+                    coins[selectedCol][selectedRow].backgroundColor = Color.DarkGray
                     message = "Select target box"
                 }
                 return@GameBoxesCanvas
@@ -120,14 +133,14 @@ fun DraughtsGame() {
                 return@GameBoxesCanvas
             }
 
-            if (coins[selectedCol][selectedRow].isKing) {
-                //Kings will have different logic
-                return@GameBoxesCanvas
-            }
-
-            var shouldMove = false
-            if (currentPlayer == Color.Red) {
-                if (!isValidRedMove(selectedRow, row, selectedCol, col)) {
+            /*
+            If the coin is king, passing the both red and green conditions,
+            it will allow the coin to move to any of the side as
+            red moves up and green moves down, so we can reuse the logic to avoid
+            code duplication
+             */
+            if (currentPlayer == Color.Red || coins[selectedCol][selectedRow].isKing) {
+                if (!isValidRedMove(selectedRow, row, selectedCol, col, coins)) {
                     message = "Invalid move"
                     return@GameBoxesCanvas
                 }
@@ -156,6 +169,7 @@ fun DraughtsGame() {
                         if (coins[selectedCol - 1][selectedRow - 1].coinColor == Color.Green) {
                             //The coin in between is green
                             //Remove the green coin
+                            crossedGreens++
                             coins[selectedCol - 1][selectedRow - 1].coinColor = null
                             coins[selectedCol - 1][selectedRow - 1].isCoinPresent = false
                             //Proceed to move the coin
@@ -173,6 +187,7 @@ fun DraughtsGame() {
                         if (coins[selectedCol + 1][selectedRow - 1].coinColor == Color.Green) {
                             //The coin in between is green
                             //Remove the green coin
+                            crossedGreens++
                             coins[selectedCol + 1][selectedRow - 1].coinColor = null
                             coins[selectedCol + 1][selectedRow - 1].isCoinPresent = false
                             //Proceed to move the coin
@@ -183,15 +198,20 @@ fun DraughtsGame() {
                             "Cannot make move, either target is not empty or in between is not occupied"
                     }
                 }
-                if (row == 0) {
+                if (row == 0 && shouldMove) {
                     //King the red player as it has reached the top
-                    coins[col][row].isKing = true
+                    coins[selectedCol][selectedRow].isKing = true
                 }
             }
-
-            if (currentPlayer == Color.Green) {
+            /*
+             If the coin is king, passing the both red and green conditions,
+             it will allow the coin to move to any of the side as
+             red moves up and green moves down, so we can reuse the logic to avoid
+             code duplication
+             */
+            if (currentPlayer == Color.Green || coins[selectedCol][selectedRow].isKing) {
                 if (!coins[col][row].isCoinPresent) {
-                    if (isValidMove(currentPlayer, selectedRow, row)) {
+                    if (isValidGreenMove(selectedRow, row, selectedCol, col, coins)) {
                         Log.d(TAG, "DraughtsGame: Valid green move ")
                         shouldMove = true
                     }
@@ -210,7 +230,8 @@ fun DraughtsGame() {
                         //There is a coin present in between
                         if (coins[selectedCol - 1][selectedRow + 1].coinColor == Color.Red) {
                             //The coin in between is red
-                            //Remove the green coin
+                            //Remove the red coin
+                            crossedReds++
                             coins[selectedCol - 1][selectedRow + 1].coinColor = null
                             coins[selectedCol - 1][selectedRow + 1].isCoinPresent = false
                             //Proceed to move the coin
@@ -227,7 +248,8 @@ fun DraughtsGame() {
                         //There is a coin present in between
                         if (coins[selectedCol + 1][selectedRow + 1].coinColor == Color.Red) {
                             //The coin in between is red
-                            //Remove the green coin
+                            //Remove the red coin
+                            crossedReds++
                             coins[selectedCol + 1][selectedRow + 1].coinColor = null
                             coins[selectedCol + 1][selectedRow + 1].isCoinPresent = false
                             //Proceed to move the coin
@@ -239,24 +261,27 @@ fun DraughtsGame() {
                         "Cannot make move, either target is not empty or in between is not occupied"
                 }
 
-                if (row == 7) {
+                if (row == 7 && shouldMove) {
                     //King the green player as it has reached the bottom
-                    coins[col][row].isKing = true
+                    coins[selectedCol][selectedRow].isKing = true
                 }
 
             }
 
             if (shouldMove) {
-                //Reset the current selection and switch the player Side
-
+                //Make the swap of coin from the selected row-col to target row-col
                 val selected = coins[selectedCol][selectedRow].coinColor
+                coins[col][row].isKing = coins[selectedCol][selectedRow].isKing
                 coins[selectedCol][selectedRow].coinColor = null
                 coins[selectedCol][selectedRow].isCoinPresent = false
-
                 coins[col][row].isCoinPresent = true
                 coins[col][row].coinColor = selected
+                //Make the background back to black otherwise the grey will stay
+                coins[selectedCol][selectedRow].backgroundColor = Color.Black
+                //Reset the selection
                 selectedCol = -1
                 selectedRow = -1
+                //Switch the player so the turns are alternated
                 currentPlayer = if (currentPlayer == Color.Red) {
                     message = "Current Player : Green"
                     Color.Green
@@ -266,23 +291,69 @@ fun DraughtsGame() {
                 }
             }
         }
+        //Show a list of coins which denotes the number of coins crossed
+        CrossedOutCoinsView(count = crossedReds, coinColor = Color.Red)
+        CrossedOutCoinsView(count = crossedGreens, coinColor = Color.Green)
+        //Show a cancel selection button when a coin is slected and a move has not been
+        //performed yet. This will allow user to have a good UX
+        if (selectedCol != -1 && selectedRow != -1) {
+            Button(onClick = {
+                coins[selectedCol][selectedRow].backgroundColor = Color.Black
+                selectedCol = -1
+                selectedRow = -1
+            }) {
+                Text(text = "Cancel Selection")
+            }
+        }
+        //12 Reds has been crossed, green won the game
+        if (crossedReds == 12) {
+            AlertDialog(onDismissRequest = {
+
+            }, confirmButton = {
+
+            },
+                title = { Text(text = "Green has won the match") }
+            )
+        }
+        //12 Greens has been crossed, green won the game
+        if (crossedGreens == 12) {
+            AlertDialog(onDismissRequest = {
+
+            }, confirmButton = {
+
+            },
+                title = { Text(text = "Red has won the match") }
+            )
+        }
     }
 }
 
-fun isValidRedMove(selectedRow: Int, row: Int, selectedCol: Int, col: Int): Boolean {
+fun isValidRedMove(
+    selectedRow: Int,
+    row: Int,
+    selectedCol: Int,
+    col: Int,
+    coins: Array<Array<Box>>
+): Boolean {
     return (selectedCol - 1 == col && selectedRow - 1 == row) ||
             (selectedCol + 1 == col && selectedRow - 1 == row) ||
-            (selectedCol - 2 == col && selectedRow - 2 == row) ||
-            (selectedCol + 2 == col && selectedRow - 2 == row)
+            (selectedCol - 2 == col && selectedRow - 2 == row && coins[selectedCol - 1][selectedRow - 1].isCoinPresent) ||
+            (selectedCol + 2 == col && selectedRow - 2 == row && coins[selectedCol + 1][selectedRow - 1].isCoinPresent)
 }
 
-private fun isValidMove(currentPlayer: Color, selRow: Int, tarRow: Int): Boolean {
-    if (currentPlayer == Color.Red) {
-        //Allow movement to top only if the player is red
-        return selRow > tarRow
-    }
-    return selRow < tarRow
+fun isValidGreenMove(
+    selectedRow: Int,
+    row: Int,
+    selectedCol: Int,
+    col: Int,
+    coins: Array<Array<Box>>
+): Boolean {
+    return (selectedCol + 1 == col && selectedRow + 1 == row) ||
+            (selectedCol - 1 == col && selectedRow + 1 == row) ||
+            (selectedCol + 2 == col && selectedRow - 2 == row && coins[selectedCol + 1][selectedRow - 1].isCoinPresent) ||
+            (selectedCol + 2 == col && selectedRow + 2 == row && coins[selectedCol + 1][selectedRow + 1].isCoinPresent)
 }
+
 
 @Composable
 fun GameBoxesCanvas(coins: Array<Array<Box>>, onCoinClick: (Int, Int) -> Unit) {
@@ -310,10 +381,9 @@ fun GameBoxesCanvas(coins: Array<Array<Box>>, onCoinClick: (Int, Int) -> Unit) {
             for (j in 0 until 8) {
                 val x = i * squareSize
                 val y = j * squareSize
-                val squareColor = if ((i + j) % 2 == 0) Color.White else Color.Black
 
                 drawRect(
-                    color = squareColor,
+                    color = coins[i][j].backgroundColor,
                     topLeft = Offset(x, y),
                     size = androidx.compose.ui.geometry.Size(squareSize, squareSize)
                 )
@@ -337,5 +407,7 @@ fun GameBoxesCanvas(coins: Array<Array<Box>>, onCoinClick: (Int, Int) -> Unit) {
             }
         }
     }
-
 }
+
+
+
