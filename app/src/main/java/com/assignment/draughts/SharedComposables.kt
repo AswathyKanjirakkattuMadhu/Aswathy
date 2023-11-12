@@ -32,9 +32,13 @@ private val TAG = "SharedComposables"
 @Composable
 @Preview
 fun DraughtsGame() {
+    //Stores the player which is currently playing
     var currentPlayer by remember {
         mutableStateOf(Color.Red)
     }
+
+    //Used selectedRow,selectedCol to store the first selection indexes and
+    //to proceed to select second target indexes to move to
     var selectedRow by remember {
         mutableStateOf(-1)
     }
@@ -45,6 +49,9 @@ fun DraughtsGame() {
         mutableStateOf("Start with RED player")
     }
 
+    //crossedReds, crossedGreens stores number of coins that has been crossed out
+    //which later is used to check whether the player has won by removing all coins
+    //and also can be used to show an UI of coins placing outside the board when crossed
     var crossedReds by remember {
         mutableStateOf(0)
     }
@@ -53,6 +60,7 @@ fun DraughtsGame() {
         mutableStateOf(0)
     }
 
+    //2D array which represents the state of the board
     var coins: Array<Array<Box>> by remember {
         mutableStateOf(
             Array(8) { row ->
@@ -84,6 +92,8 @@ fun DraughtsGame() {
             currentPlayer = Color.Red
             selectedCol = -1
             selectedRow = -1
+            crossedGreens = 0
+            crossedReds = 0
             coins = Array(8) { row ->
                 Array(8) { col ->
                     val box = Box()
@@ -140,7 +150,14 @@ fun DraughtsGame() {
             code duplication
              */
             if (currentPlayer == Color.Red || coins[selectedCol][selectedRow].isKing) {
-                if (!isValidRedMove(selectedRow, row, selectedCol, col, coins)) {
+                if (!isValidRedMove(
+                        selectedRow,
+                        row,
+                        selectedCol,
+                        col,
+                        coins
+                    ) && !coins[selectedCol][selectedRow].isKing
+                ) {
                     message = "Invalid move"
                     return@GameBoxesCanvas
                 }
@@ -166,7 +183,7 @@ fun DraughtsGame() {
                     //Trying to cross left diagonal coin
                     if (coins[selectedCol - 1][selectedRow - 1].isCoinPresent && !coins[col][row].isCoinPresent) {
                         //There is a coin present in between
-                        if (coins[selectedCol - 1][selectedRow - 1].coinColor == Color.Green) {
+                        if (coins[selectedCol - 1][selectedRow - 1].coinColor == Color.Green || coins[selectedCol][selectedRow].isKing) {
                             //The coin in between is green
                             //Remove the green coin
                             crossedGreens++
@@ -184,7 +201,7 @@ fun DraughtsGame() {
                     //Trying to cross left diagonal coin
                     if (coins[selectedCol + 1][selectedRow - 1].isCoinPresent && !coins[col][row].isCoinPresent) {
                         //There is a coin present in between
-                        if (coins[selectedCol + 1][selectedRow - 1].coinColor == Color.Green) {
+                        if (coins[selectedCol + 1][selectedRow - 1].coinColor == Color.Green || coins[selectedCol][selectedRow].isKing) {
                             //The coin in between is green
                             //Remove the green coin
                             crossedGreens++
@@ -211,7 +228,14 @@ fun DraughtsGame() {
              */
             if (currentPlayer == Color.Green || coins[selectedCol][selectedRow].isKing) {
                 if (!coins[col][row].isCoinPresent) {
-                    if (isValidGreenMove(selectedRow, row, selectedCol, col, coins)) {
+                    if (isValidGreenMove(
+                            selectedRow,
+                            row,
+                            selectedCol,
+                            col,
+                            coins
+                        ) && !coins[selectedCol][selectedRow].isKing
+                    ) {
                         Log.d(TAG, "DraughtsGame: Valid green move ")
                         shouldMove = true
                     }
@@ -228,7 +252,7 @@ fun DraughtsGame() {
                     //Trying to cross bottom right diagonal coin
                     if (coins[selectedCol - 1][selectedRow + 1].isCoinPresent) {
                         //There is a coin present in between
-                        if (coins[selectedCol - 1][selectedRow + 1].coinColor == Color.Red) {
+                        if (coins[selectedCol - 1][selectedRow + 1].coinColor == Color.Red || coins[selectedCol][selectedRow].isKing) {
                             //The coin in between is red
                             //Remove the red coin
                             crossedReds++
@@ -246,7 +270,7 @@ fun DraughtsGame() {
                     //Trying to cross left diagonal coin
                     if (coins[selectedCol + 1][selectedRow + 1].isCoinPresent && !coins[col][row].isCoinPresent) {
                         //There is a coin present in between
-                        if (coins[selectedCol + 1][selectedRow + 1].coinColor == Color.Red) {
+                        if (coins[selectedCol + 1][selectedRow + 1].coinColor == Color.Red || coins[selectedCol][selectedRow].isKing) {
                             //The coin in between is red
                             //Remove the red coin
                             crossedReds++
@@ -307,27 +331,37 @@ fun DraughtsGame() {
         }
         //12 Reds has been crossed, green won the game
         if (crossedReds == 12) {
-            AlertDialog(onDismissRequest = {
-
-            }, confirmButton = {
-
-            },
-                title = { Text(text = "Green has won the match") }
-            )
+            ShowGameWonAlert(player = "Green")
         }
         //12 Greens has been crossed, green won the game
         if (crossedGreens == 12) {
-            AlertDialog(onDismissRequest = {
-
-            }, confirmButton = {
-
-            },
-                title = { Text(text = "Red has won the match") }
-            )
+            ShowGameWonAlert(player = "Red")
         }
     }
 }
 
+
+//Show alert box that the player has won the match
+@Composable
+fun ShowGameWonAlert(player: String) {
+    var isFinished: Boolean by remember {
+        mutableStateOf(true)
+    }
+    if (isFinished) {
+        AlertDialog(onDismissRequest = {
+
+        }, confirmButton = {
+            Button(onClick = { isFinished = false }) {
+                Text(text = "Done")
+            }
+        },
+            title = { Text(text = "$player has won the match") }
+        )
+    }
+}
+
+//Check the movement of a RED coin is valid,
+//this validates the movement to first diagonal box or to the second diagonal box if crossing is possible
 fun isValidRedMove(
     selectedRow: Int,
     row: Int,
@@ -341,6 +375,8 @@ fun isValidRedMove(
             (selectedCol + 2 == col && selectedRow - 2 == row && coins[selectedCol + 1][selectedRow - 1].isCoinPresent)
 }
 
+//Check the movement of a GREEN coin is valid,
+//this validates the movement to first diagonal box or to the second diagonal box if crossing is possible
 fun isValidGreenMove(
     selectedRow: Int,
     row: Int,
@@ -355,12 +391,14 @@ fun isValidGreenMove(
 }
 
 
+//Main board canvas which shows the whites and black boxes and with coins
 @Composable
 fun GameBoxesCanvas(coins: Array<Array<Box>>, onCoinClick: (Int, Int) -> Unit) {
     var canvasSize by remember { mutableStateOf(Offset(0f, 0f)) }
 
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
+    //Usage of single canvas and dividing them up to create mini boxes
     Canvas(
         modifier = Modifier
             .width(screenWidth)
@@ -368,6 +406,7 @@ fun GameBoxesCanvas(coins: Array<Array<Box>>, onCoinClick: (Int, Int) -> Unit) {
             .background(Color.Gray)
             .pointerInput(Unit) {
                 detectTapGestures { pan ->
+                    //To detect the clicks for moving coins
                     val column = (pan.x / (size.width / 8)).toInt()
                     val row = (pan.y / (size.height / 8)).toInt()
                     onCoinClick(column, row)
@@ -376,18 +415,20 @@ fun GameBoxesCanvas(coins: Array<Array<Box>>, onCoinClick: (Int, Int) -> Unit) {
     ) {
         val canvasWidth = size.width
         val squareSize = canvasWidth / 8f
-
+        //Fill up 8x8 boxes to UI
         for (i in 0 until 8) {
             for (j in 0 until 8) {
                 val x = i * squareSize
                 val y = j * squareSize
 
+                //Draw the background as white or black. If the position is selected to
+                //move then the color would be grey to highlight the selection
                 drawRect(
                     color = coins[i][j].backgroundColor,
                     topLeft = Offset(x, y),
                     size = androidx.compose.ui.geometry.Size(squareSize, squareSize)
                 )
-
+                //Draw a coin if the position is containing a coin with the coin color
                 if (coins[i][j].isCoinPresent) {
                     coins[i][j].coinColor?.let {
                         drawCircle(
@@ -396,6 +437,7 @@ fun GameBoxesCanvas(coins: Array<Array<Box>>, onCoinClick: (Int, Int) -> Unit) {
                             radius = squareSize / 3,
                         )
                     }
+                    //If the coin is king then denote the king with a mini circle inside it
                     if (coins[i][j].isKing) {
                         drawCircle(
                             Color.DarkGray,
