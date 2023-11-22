@@ -362,11 +362,13 @@ fun DraughtsGame() {
         }
         //12 Reds has been crossed, green won the game
         if (crossedReds == 12) {
-            ShowGameWonAlert(player = "Bottom")
+            ShowGameWonAlert(player = "Bottom player")
+            coins = initializeCoins(context)
         }
         //12 Greens has been crossed, green won the game
         if (crossedGreens == 12) {
-            ShowGameWonAlert(player = "Top")
+            ShowGameWonAlert(player = "Top player")
+            coins = initializeCoins(context)
         }
 
         if (settingsAlert) {
