@@ -1,40 +1,74 @@
 package com.assignment.draughts
 
+import android.content.Context
+import android.content.Context.MODE_PRIVATE
 import android.util.Log
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.assignment.draughts.Conditionals.Companion.isFirstSelection
 
 /*
 Entry point for UI
  */
 private val TAG = "SharedComposables"
+private val SETTINGS = "settings"
+private val PLAYER_TOP = "playertop"
+private val PLAYER_BOTTOM = "playerbottom"
+private val BACKGROUND_DARK = "darkbackground"
+private val BACKGROUND_LIGHT = "lightbackground"
+
 
 @Composable
 @Preview
 fun DraughtsGame() {
     //Stores the player which is currently playing
+
+    val context = LocalContext.current
+
+    val topPlayerColor by remember {
+        mutableStateOf(getTopPlayerColor(context))
+    }
+
+    val bottomPlayerColor by remember {
+        mutableStateOf(getBottomPlayerColor(context))
+    }
     var currentPlayer by remember {
-        mutableStateOf(Color.Red)
+        mutableStateOf(topPlayerColor)
     }
 
     //Used selectedRow,selectedCol to store the first selection indexes and
@@ -60,62 +94,59 @@ fun DraughtsGame() {
         mutableStateOf(0)
     }
 
+    var settingsAlert by remember {
+        mutableStateOf(false)
+    }
+
+    var selectedAlertOption by remember {
+        mutableStateOf("")
+    }
+
+    var selectedColorInt by remember {
+        mutableStateOf(0)
+    }
+
     //2D array which represents the state of the board
     var coins: Array<Array<Box>> by remember {
-        mutableStateOf(
-            Array(8) { row ->
-                Array(8) { col ->
-                    val box = Box()
-                    box.apply {
-                        backgroundColor = if (((row + col) % 2) == 0) {
-                            Color.White
-                        } else {
-                            Color.Black
-                        }
-                        if (backgroundColor == Color.Black && col != 3 && col != 4) {
-                            isCoinPresent = true
-                            coinColor = if (col <= 3) {
-                                Color.Green
-                            } else {
-                                Color.Red
-                            }
-                        }
-                    }
-                }
-            }
-        )
+        mutableStateOf(initializeCoins(context))
     }
 
     Column {
         Text(text = message)
-        Button(onClick = {
-            currentPlayer = Color.Red
-            selectedCol = -1
-            selectedRow = -1
-            crossedGreens = 0
-            crossedReds = 0
-            coins = Array(8) { row ->
-                Array(8) { col ->
-                    val box = Box()
-                    box.apply {
-                        backgroundColor = if (((row + col) % 2) == 0) {
-                            Color.White
-                        } else {
-                            Color.Black
-                        }
-                        if (backgroundColor == Color.Black && col != 3 && col != 4) {
-                            isCoinPresent = true
-                            coinColor = if (col <= 3) {
-                                Color.Green
+        Row {
+            Button(onClick = {
+                currentPlayer = topPlayerColor
+                selectedCol = -1
+                selectedRow = -1
+                crossedGreens = 0
+                crossedReds = 0
+                coins = Array(8) { row ->
+                    Array(8) { col ->
+                        val box = Box()
+                        box.apply {
+                            backgroundColor = if (((row + col) % 2) == 0) {
+                                getLightBackgroundColor(context)
                             } else {
-                                Color.Red
+                                getDarkBackgroundColor(context)
+                            }
+                            if (backgroundColor == Color.Black && col != 3 && col != 4) {
+                                isCoinPresent = true
+                                coinColor = if (col <= 3) {
+                                    bottomPlayerColor
+                                } else {
+                                    topPlayerColor
+                                }
                             }
                         }
                     }
                 }
+            }) {
+                Text(text = "Reset")
             }
-        }) {
-            Text(text = "Reset")
+            Spacer(Modifier.weight(1f))
+            Button(onClick = { settingsAlert = true }) {
+                Text(text = "Settings")
+            }
         }
 
         GameBoxesCanvas(coins) { col, row ->
@@ -149,7 +180,7 @@ fun DraughtsGame() {
             red moves up and green moves down, so we can reuse the logic to avoid
             code duplication
              */
-            if (currentPlayer == Color.Red || coins[selectedCol][selectedRow].isKing) {
+            if (currentPlayer == topPlayerColor || coins[selectedCol][selectedRow].isKing) {
                 if (!isValidRedMove(
                         selectedRow,
                         row,
@@ -183,7 +214,7 @@ fun DraughtsGame() {
                     //Trying to cross left diagonal coin
                     if (coins[selectedCol - 1][selectedRow - 1].isCoinPresent && !coins[col][row].isCoinPresent) {
                         //There is a coin present in between
-                        if (coins[selectedCol - 1][selectedRow - 1].coinColor == Color.Green || coins[selectedCol][selectedRow].isKing) {
+                        if (coins[selectedCol - 1][selectedRow - 1].coinColor == bottomPlayerColor || coins[selectedCol][selectedRow].isKing) {
                             //The coin in between is green
                             //Remove the green coin
                             crossedGreens++
@@ -201,7 +232,7 @@ fun DraughtsGame() {
                     //Trying to cross left diagonal coin
                     if (coins[selectedCol + 1][selectedRow - 1].isCoinPresent && !coins[col][row].isCoinPresent) {
                         //There is a coin present in between
-                        if (coins[selectedCol + 1][selectedRow - 1].coinColor == Color.Green || coins[selectedCol][selectedRow].isKing) {
+                        if (coins[selectedCol + 1][selectedRow - 1].coinColor == bottomPlayerColor || coins[selectedCol][selectedRow].isKing) {
                             //The coin in between is green
                             //Remove the green coin
                             crossedGreens++
@@ -226,7 +257,7 @@ fun DraughtsGame() {
              red moves up and green moves down, so we can reuse the logic to avoid
              code duplication
              */
-            if (currentPlayer == Color.Green || coins[selectedCol][selectedRow].isKing) {
+            if (currentPlayer == bottomPlayerColor || coins[selectedCol][selectedRow].isKing) {
                 if (!coins[col][row].isCoinPresent) {
                     if (isValidGreenMove(
                             selectedRow,
@@ -252,7 +283,7 @@ fun DraughtsGame() {
                     //Trying to cross bottom right diagonal coin
                     if (coins[selectedCol - 1][selectedRow + 1].isCoinPresent) {
                         //There is a coin present in between
-                        if (coins[selectedCol - 1][selectedRow + 1].coinColor == Color.Red || coins[selectedCol][selectedRow].isKing) {
+                        if (coins[selectedCol - 1][selectedRow + 1].coinColor == topPlayerColor || coins[selectedCol][selectedRow].isKing) {
                             //The coin in between is red
                             //Remove the red coin
                             crossedReds++
@@ -270,7 +301,7 @@ fun DraughtsGame() {
                     //Trying to cross left diagonal coin
                     if (coins[selectedCol + 1][selectedRow + 1].isCoinPresent && !coins[col][row].isCoinPresent) {
                         //There is a coin present in between
-                        if (coins[selectedCol + 1][selectedRow + 1].coinColor == Color.Red || coins[selectedCol][selectedRow].isKing) {
+                        if (coins[selectedCol + 1][selectedRow + 1].coinColor == topPlayerColor || coins[selectedCol][selectedRow].isKing) {
                             //The coin in between is red
                             //Remove the red coin
                             crossedReds++
@@ -306,18 +337,18 @@ fun DraughtsGame() {
                 selectedCol = -1
                 selectedRow = -1
                 //Switch the player so the turns are alternated
-                currentPlayer = if (currentPlayer == Color.Red) {
-                    message = "Current Player : Green"
-                    Color.Green
+                currentPlayer = if (currentPlayer == topPlayerColor) {
+                    message = "Current Player : Top"
+                    bottomPlayerColor
                 } else {
-                    message = "Current Player : Red"
-                    Color.Red
+                    message = "Current Player : Bottom"
+                    topPlayerColor
                 }
             }
         }
         //Show a list of coins which denotes the number of coins crossed
-        CrossedOutCoinsView(count = crossedReds, coinColor = Color.Red)
-        CrossedOutCoinsView(count = crossedGreens, coinColor = Color.Green)
+        CrossedOutCoinsView(count = crossedReds, coinColor = topPlayerColor)
+        CrossedOutCoinsView(count = crossedGreens, coinColor = bottomPlayerColor)
         //Show a cancel selection button when a coin is slected and a move has not been
         //performed yet. This will allow user to have a good UX
         if (selectedCol != -1 && selectedRow != -1) {
@@ -331,13 +362,204 @@ fun DraughtsGame() {
         }
         //12 Reds has been crossed, green won the game
         if (crossedReds == 12) {
-            ShowGameWonAlert(player = "Green")
+            ShowGameWonAlert(player = "Bottom")
         }
         //12 Greens has been crossed, green won the game
         if (crossedGreens == 12) {
-            ShowGameWonAlert(player = "Red")
+            ShowGameWonAlert(player = "Top")
+        }
+
+        if (settingsAlert) {
+            var showSlider by remember {
+                mutableStateOf(false)
+            }
+            Dialog(onDismissRequest = {
+                settingsAlert = false
+            }) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .width(400.dp)
+                        .border(
+                            border = BorderStroke(
+                                10.dp, color = Color(
+                                    android.graphics.Color.parseColor(
+                                        String.format(
+                                            "#%06X",
+                                            0xFFFFFF and selectedColorInt
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "Top Player Color")
+                            Spacer(Modifier.weight(1f))
+                            Button(
+                                onClick = {
+                                    selectedAlertOption = PLAYER_TOP
+                                    showSlider = true
+                                },
+                                colors = ButtonDefaults.buttonColors(getTopPlayerColor(context))
+                            ) {
+                                Text(text = "Edit")
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "Bottom Player Color")
+                            Spacer(Modifier.weight(1f))
+                            Button(
+                                onClick = {
+                                    selectedAlertOption = PLAYER_BOTTOM
+                                    showSlider = true
+                                },
+                                colors = ButtonDefaults.buttonColors(getBottomPlayerColor(context))
+                            ) {
+                                Text(text = "Edit")
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "Dark Background Color")
+                            Spacer(Modifier.weight(1f))
+                            Button(
+                                onClick = {
+                                    selectedAlertOption = BACKGROUND_DARK
+                                    showSlider = true
+                                },
+                                colors = ButtonDefaults.buttonColors(getDarkBackgroundColor(context))
+                            ) {
+                                Text(text = "Edit")
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "Light Background Color")
+                            Spacer(Modifier.weight(1f))
+                            Button(
+                                onClick = {
+                                    selectedAlertOption = BACKGROUND_LIGHT
+                                    showSlider = true
+                                },
+                                colors = ButtonDefaults.buttonColors(getLightBackgroundColor(context))
+                            ) {
+                                Text(text = "Edit")
+                            }
+                        }
+
+                        Slider(
+                            value = selectedColorInt.toFloat(),
+                            onValueChange = {
+                                Log.d(TAG, "DraughtsGame: $it")
+                                selectedColorInt = it.toInt()
+                            },
+                            colors = SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.secondary,
+                                activeTrackColor = MaterialTheme.colorScheme.secondary,
+                                inactiveTrackColor = MaterialTheme.colorScheme.secondaryContainer,
+                            ),
+                            steps = 100,
+                            valueRange = 0f..50000f
+                        )
+                        Button(
+                            onClick = {
+                                saveColorToStorage(
+                                    selectedColorInt,
+                                    selectedAlertOption,
+                                    context
+                                )
+                                coins = initializeCoins(context)
+                            }, modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .padding(8.dp)
+                        ) {
+                            Text(text = if(selectedAlertOption.isEmpty()) "Select option to edit" else "Save $selectedAlertOption")
+                        }
+                        Button(
+                            onClick = {
+                                resetColors(context)
+                                coins= initializeCoins(context)
+                            }, modifier = Modifier
+                                .height(50.dp)
+                                .padding(8.dp)
+                        ) {
+                            Text(text = "Reset")
+                        }
+                    }
+
+                }
+            }
         }
     }
+
+}
+
+fun getDarkBackgroundColor(context: Context): Color {
+    val prefs = context.getSharedPreferences(SETTINGS, MODE_PRIVATE)
+    val colorString = prefs.getString(BACKGROUND_DARK, "#000000")
+    return Color(android.graphics.Color.parseColor(colorString))
+}
+
+fun getLightBackgroundColor(context: Context): Color {
+    val prefs = context.getSharedPreferences(SETTINGS, MODE_PRIVATE)
+    val colorString = prefs.getString(BACKGROUND_LIGHT, "#ffffff")
+    return Color(android.graphics.Color.parseColor(colorString))
+}
+
+private fun initializeCoins(context: Context): Array<Array<Box>> {
+    var coins: Array<Array<Box>> =
+        Array(8) { row ->
+            Array(8) { col ->
+                val box = Box()
+                box.apply {
+                    backgroundColor = if (((row + col) % 2) == 0) {
+                        getLightBackgroundColor(context)
+                    } else {
+                        getDarkBackgroundColor(context)
+                    }
+                    if (backgroundColor == Color.Black && col != 3 && col != 4) {
+                        isCoinPresent = true
+                        coinColor = if (col <= 3) {
+                            getBottomPlayerColor(context)
+                        } else {
+                            getTopPlayerColor(context)
+                        }
+                    }
+                }
+            }
+        }
+    return coins
+}
+fun saveColorToStorage(selectedColorInt: Int, selectedAlertOption: String, context: Context) {
+    Log.d(TAG, "saveColorToStorage: $selectedAlertOption")
+    val prefs = context.getSharedPreferences(SETTINGS, MODE_PRIVATE)
+    val editor = prefs.edit()
+    val hex = String.format("#%06X", 0xFFFFFF and selectedColorInt)
+    editor.putString(selectedAlertOption, hex)
+    editor.apply()
+}
+
+fun resetColors(context: Context) {
+    val prefs = context.getSharedPreferences(SETTINGS, MODE_PRIVATE)
+    val editor = prefs.edit()
+    editor.putString(BACKGROUND_DARK, "#000000")
+    editor.putString(BACKGROUND_LIGHT, "#ffffff")
+    editor.putString(PLAYER_TOP,"#b3003e")
+    editor.putString(PLAYER_BOTTOM,"#078205")
+    editor.apply()
+}
+
+fun getBottomPlayerColor(context: Context): Color {
+    val prefs = context.getSharedPreferences(SETTINGS, MODE_PRIVATE)
+    val colorString = prefs.getString(PLAYER_TOP, "#b0281e")
+    return Color(android.graphics.Color.parseColor(colorString))
+}
+
+fun getTopPlayerColor(context: Context): Color {
+    val prefs = context.getSharedPreferences(SETTINGS, MODE_PRIVATE)
+    val colorString = prefs.getString(PLAYER_BOTTOM, "#1fbfb5")
+    return Color(android.graphics.Color.parseColor(colorString))
 }
 
 
