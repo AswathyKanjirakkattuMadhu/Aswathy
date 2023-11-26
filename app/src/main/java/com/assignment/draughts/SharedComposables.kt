@@ -360,15 +360,50 @@ fun DraughtsGame() {
                 Text(text = "Cancel Selection")
             }
         }
-        //12 Reds has been crossed, green won the game
-        if (crossedReds == 12) {
-            ShowGameWonAlert(player = "Bottom player")
-            coins = initializeCoins(context)
+        //12 top has been crossed, bottom won the game
+        if (isPlayerEmpty(coins, topPlayerColor)) {
+            crossedGreens = 0
+            crossedReds = 0
+            var isFinished: Boolean by remember {
+                mutableStateOf(true)
+            }
+            if (isFinished) {
+                AlertDialog(onDismissRequest = {
+
+                }, confirmButton = {
+                    Button(onClick = {
+                        isFinished = false
+                        coins = initializeCoins(context)
+                    }) {
+                        Text(text = "Done")
+                        //  coins = initializeCoins(context)
+                    }
+                },
+                    title = { Text(text = "Bottom Player has won the match") }
+                )
+            }
         }
-        //12 Greens has been crossed, green won the game
-        if (crossedGreens == 12) {
-            ShowGameWonAlert(player = "Top player")
-            coins = initializeCoins(context)
+        //12 bottom has been crossed, top won the game
+        if (isPlayerEmpty(coins, bottomPlayerColor)) {
+            crossedGreens = 0
+            crossedReds = 0
+            var isFinished = true
+            if (isFinished) {
+                AlertDialog(onDismissRequest = {
+
+                }, confirmButton = {
+                    Button(onClick = {
+                        isFinished = false
+                        coins = initializeCoins(context)
+                    }
+                    ) {
+                        Text(text = "Done")
+
+                    }
+                },
+                    title = { Text(text = "Top Player has won the match") }
+                )
+            }
         }
 
         if (settingsAlert) {
@@ -476,12 +511,12 @@ fun DraughtsGame() {
                                 .height(50.dp)
                                 .padding(8.dp)
                         ) {
-                            Text(text = if(selectedAlertOption.isEmpty()) "Select option to edit" else "Save $selectedAlertOption")
+                            Text(text = if (selectedAlertOption.isEmpty()) "Select option to edit" else "Save $selectedAlertOption")
                         }
                         Button(
                             onClick = {
                                 resetColors(context)
-                                coins= initializeCoins(context)
+                                coins = initializeCoins(context)
                             }, modifier = Modifier
                                 .height(50.dp)
                                 .padding(8.dp)
@@ -495,6 +530,20 @@ fun DraughtsGame() {
         }
     }
 
+}
+
+fun isPlayerEmpty(coins: Array<Array<Box>>, topPlayerColor: Color): Boolean {
+    var count = 0
+    coins.iterator().forEachRemaining {
+        it.iterator().forEachRemaining { it2 ->
+            if (it2.coinColor != null) {
+                if (it2.coinColor == topPlayerColor) {
+                    count++
+                }
+            }
+        }
+    }
+    return count == 11
 }
 
 fun getDarkBackgroundColor(context: Context): Color {
@@ -533,6 +582,7 @@ private fun initializeCoins(context: Context): Array<Array<Box>> {
         }
     return coins
 }
+
 fun saveColorToStorage(selectedColorInt: Int, selectedAlertOption: String, context: Context) {
     Log.d(TAG, "saveColorToStorage: $selectedAlertOption")
     val prefs = context.getSharedPreferences(SETTINGS, MODE_PRIVATE)
@@ -547,8 +597,8 @@ fun resetColors(context: Context) {
     val editor = prefs.edit()
     editor.putString(BACKGROUND_DARK, "#000000")
     editor.putString(BACKGROUND_LIGHT, "#ffffff")
-    editor.putString(PLAYER_TOP,"#b3003e")
-    editor.putString(PLAYER_BOTTOM,"#078205")
+    editor.putString(PLAYER_TOP, "#b3003e")
+    editor.putString(PLAYER_BOTTOM, "#078205")
     editor.apply()
 }
 
@@ -568,20 +618,7 @@ fun getTopPlayerColor(context: Context): Color {
 //Show alert box that the player has won the match
 @Composable
 fun ShowGameWonAlert(player: String) {
-    var isFinished: Boolean by remember {
-        mutableStateOf(true)
-    }
-    if (isFinished) {
-        AlertDialog(onDismissRequest = {
 
-        }, confirmButton = {
-            Button(onClick = { isFinished = false }) {
-                Text(text = "Done")
-            }
-        },
-            title = { Text(text = "$player has won the match") }
-        )
-    }
 }
 
 //Check the movement of a RED coin is valid,
