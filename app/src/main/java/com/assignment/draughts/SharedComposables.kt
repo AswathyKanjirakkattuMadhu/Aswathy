@@ -80,7 +80,7 @@ fun DraughtsGame() {
         mutableStateOf(-1)
     }
     var message by remember {
-        mutableStateOf("Start with RED player")
+        mutableStateOf("Start with Top player")
     }
 
     //crossedReds, crossedGreens stores number of coins that has been crossed out
@@ -129,7 +129,7 @@ fun DraughtsGame() {
                             } else {
                                 getDarkBackgroundColor(context)
                             }
-                            if (backgroundColor == Color.Black && col != 3 && col != 4) {
+                            if (backgroundColor == getDarkBackgroundColor(context) && col != 3 && col != 4) {
                                 isCoinPresent = true
                                 coinColor = if (col <= 3) {
                                     bottomPlayerColor
@@ -332,7 +332,7 @@ fun DraughtsGame() {
                 coins[col][row].isCoinPresent = true
                 coins[col][row].coinColor = selected
                 //Make the background back to black otherwise the grey will stay
-                coins[selectedCol][selectedRow].backgroundColor = Color.Black
+                coins[selectedCol][selectedRow].backgroundColor = getDarkBackgroundColor(context)
                 //Reset the selection
                 selectedCol = -1
                 selectedRow = -1
@@ -353,7 +353,7 @@ fun DraughtsGame() {
         //performed yet. This will allow user to have a good UX
         if (selectedCol != -1 && selectedRow != -1) {
             Button(onClick = {
-                coins[selectedCol][selectedRow].backgroundColor = Color.Black
+                coins[selectedCol][selectedRow].backgroundColor = getDarkBackgroundColor(context)
                 selectedCol = -1
                 selectedRow = -1
             }) {
@@ -543,7 +543,7 @@ fun isPlayerEmpty(coins: Array<Array<Box>>, topPlayerColor: Color): Boolean {
             }
         }
     }
-    return count == 11
+    return count == 0
 }
 
 fun getDarkBackgroundColor(context: Context): Color {
@@ -559,7 +559,7 @@ fun getLightBackgroundColor(context: Context): Color {
 }
 
 private fun initializeCoins(context: Context): Array<Array<Box>> {
-    var coins: Array<Array<Box>> =
+    val coins: Array<Array<Box>> =
         Array(8) { row ->
             Array(8) { col ->
                 val box = Box()
@@ -569,7 +569,7 @@ private fun initializeCoins(context: Context): Array<Array<Box>> {
                     } else {
                         getDarkBackgroundColor(context)
                     }
-                    if (backgroundColor == Color.Black && col != 3 && col != 4) {
+                    if (backgroundColor == getDarkBackgroundColor(context) && col != 3 && col != 4) {
                         isCoinPresent = true
                         coinColor = if (col <= 3) {
                             getBottomPlayerColor(context)
