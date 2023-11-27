@@ -8,7 +8,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,7 +19,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -80,7 +78,7 @@ fun DraughtsGame() {
         mutableStateOf(-1)
     }
     var message by remember {
-        mutableStateOf("Start with Top player")
+        mutableStateOf("Start with bottom player")
     }
 
     //crossedReds, crossedGreens stores number of coins that has been crossed out
@@ -106,9 +104,13 @@ fun DraughtsGame() {
         mutableStateOf(0)
     }
 
+    var crossed by remember {
+        mutableStateOf(false)
+    }
+
     //2D array which represents the state of the board
     var coins: Array<Array<Box>> by remember {
-        mutableStateOf(initializeCoins(context))
+        mutableStateOf(populateCoins(context))
     }
 
     Column {
@@ -152,7 +154,7 @@ fun DraughtsGame() {
         GameBoxesCanvas(coins) { col, row ->
             message = "Selected $row $col, Please select target box"
             var shouldMove = false
-
+            crossed = false
             Log.d(TAG, "DraughtsGame: Selected Col $selectedCol Selected Row $selectedRow")
             Log.d(TAG, "DraughtsGame: Target Col $col Target Row $row")
             if (isFirstSelection(selectedCol, selectedRow)) {
@@ -181,14 +183,8 @@ fun DraughtsGame() {
             code duplication
              */
             if (currentPlayer == topPlayerColor || coins[selectedCol][selectedRow].isKing) {
-                if (!isValidRedMove(
-                        selectedRow,
-                        row,
-                        selectedCol,
-                        col,
-                        coins
-                    ) && !coins[selectedCol][selectedRow].isKing
-                ) {
+                if (!isValidRedMove(selectedRow, row, selectedCol, col, coins)
+                    && !coins[selectedCol][selectedRow].isKing) {
                     message = "Invalid move"
                     return@GameBoxesCanvas
                 }
@@ -222,6 +218,7 @@ fun DraughtsGame() {
                             coins[selectedCol - 1][selectedRow - 1].isCoinPresent = false
                             //Proceed to move the coin
                             shouldMove = true
+                            crossed = true
                         }
                     } else {
                         message =
@@ -240,6 +237,7 @@ fun DraughtsGame() {
                             coins[selectedCol + 1][selectedRow - 1].isCoinPresent = false
                             //Proceed to move the coin
                             shouldMove = true
+                            crossed = true
                         }
                     } else {
                         message =
@@ -259,13 +257,8 @@ fun DraughtsGame() {
              */
             if (currentPlayer == bottomPlayerColor || coins[selectedCol][selectedRow].isKing) {
                 if (!coins[col][row].isCoinPresent) {
-                    if (isValidGreenMove(
-                            selectedRow,
-                            row,
-                            selectedCol,
-                            col,
-                            coins
-                        ) && !coins[selectedCol][selectedRow].isKing
+                    if (isValidGreenMove(selectedRow, row, selectedCol, col, coins)
+                        && !coins[selectedCol][selectedRow].isKing
                     ) {
                         Log.d(TAG, "DraughtsGame: Valid green move ")
                         shouldMove = true
@@ -291,6 +284,7 @@ fun DraughtsGame() {
                             coins[selectedCol - 1][selectedRow + 1].isCoinPresent = false
                             //Proceed to move the coin
                             shouldMove = true
+                            crossed = true
                         }
                     }
                 } else {
@@ -309,6 +303,7 @@ fun DraughtsGame() {
                             coins[selectedCol + 1][selectedRow + 1].isCoinPresent = false
                             //Proceed to move the coin
                             shouldMove = true
+                            crossed = true
                         }
                     }
                 } else {
@@ -337,13 +332,32 @@ fun DraughtsGame() {
                 selectedCol = -1
                 selectedRow = -1
                 //Switch the player so the turns are alternated
-                currentPlayer = if (currentPlayer == topPlayerColor) {
-                    message = "Current Player : Top"
-                    bottomPlayerColor
-                } else {
-                    message = "Current Player : Bottom"
-                    topPlayerColor
+                if(crossed){
+                    if(currentPlayer == bottomPlayerColor && bottomPlayerCanContinue(coins,col,row,bottomPlayerColor)){
+                        message = "Continuous Play for : Top"
+                        currentPlayer =   bottomPlayerColor
+                    }else if (currentPlayer == topPlayerColor && topPlayerCanContinue(coins,col,row,topPlayerColor)){
+                        message = "Continuous Play for : Bottom"
+                        currentPlayer = topPlayerColor
+                    }else{
+                        currentPlayer = if (currentPlayer == topPlayerColor) {
+                            message = "Current Player : Top"
+                            bottomPlayerColor
+                        } else {
+                            message = "Current Player : Bottom"
+                            topPlayerColor
+                        }
+                    }
+                }else {
+                    currentPlayer = if (currentPlayer == topPlayerColor) {
+                        message = "Current Player : Top"
+                        bottomPlayerColor
+                    } else {
+                        message = "Current Player : Bottom"
+                        topPlayerColor
+                    }
                 }
+
             }
         }
         //Show a list of coins which denotes the number of coins crossed
@@ -373,10 +387,9 @@ fun DraughtsGame() {
                 }, confirmButton = {
                     Button(onClick = {
                         isFinished = false
-                        coins = initializeCoins(context)
+                        coins = populateCoins(context)
                     }) {
                         Text(text = "Done")
-                        //  coins = initializeCoins(context)
                     }
                 },
                     title = { Text(text = "Bottom Player has won the match") }
@@ -394,7 +407,7 @@ fun DraughtsGame() {
                 }, confirmButton = {
                     Button(onClick = {
                         isFinished = false
-                        coins = initializeCoins(context)
+                        coins = populateCoins(context)
                     }
                     ) {
                         Text(text = "Done")
@@ -505,7 +518,7 @@ fun DraughtsGame() {
                                     selectedAlertOption,
                                     context
                                 )
-                                coins = initializeCoins(context)
+                                coins = populateCoins(context)
                             }, modifier = Modifier
                                 .fillMaxWidth()
                                 .height(50.dp)
@@ -516,7 +529,7 @@ fun DraughtsGame() {
                         Button(
                             onClick = {
                                 resetColors(context)
-                                coins = initializeCoins(context)
+                                coins = populateCoins(context)
                             }, modifier = Modifier
                                 .height(50.dp)
                                 .padding(8.dp)
@@ -530,6 +543,42 @@ fun DraughtsGame() {
         }
     }
 
+}
+
+fun topPlayerCanContinue(coins: Array<Array<Box>>, col: Int, row: Int, topPlayerColor: Color): Boolean {
+    var hasMove = false
+    try {
+        hasMove = coins[col - 1][row - 1].isCoinPresent && !coins[col - 2][row - 2].isCoinPresent && coins[col - 1][row - 1].coinColor != topPlayerColor
+    }catch (e:Exception){
+
+    }
+    if(hasMove){
+        return true
+    }
+    try {
+        hasMove = coins[col + 1][row - 1].isCoinPresent && !coins[col + 2][row - 2].isCoinPresent && coins[col + 1][row -1].coinColor != topPlayerColor
+    }catch (e:Exception){
+
+    }
+    return hasMove
+}
+
+fun bottomPlayerCanContinue(coins: Array<Array<Box>>, col: Int, row: Int, topPlayerColor: Color): Boolean {
+    var hasMove = false
+    try {
+        hasMove = coins[col + 1][row + 1].isCoinPresent && !coins[col + 2][row + 2].isCoinPresent && coins[col + 1][row + 1].coinColor != topPlayerColor
+    }catch (e:Exception){
+
+    }
+    if(hasMove){
+        return true
+    }
+    try {
+        hasMove = coins[col - 1][row + 1].isCoinPresent && !coins[col - 2][row + 2].isCoinPresent && coins[col - 1][row + 1].coinColor != topPlayerColor
+    }catch (e:Exception){
+
+    }
+    return hasMove
 }
 
 fun isPlayerEmpty(coins: Array<Array<Box>>, topPlayerColor: Color): Boolean {
@@ -558,7 +607,7 @@ fun getLightBackgroundColor(context: Context): Color {
     return Color(android.graphics.Color.parseColor(colorString))
 }
 
-private fun initializeCoins(context: Context): Array<Array<Box>> {
+private fun populateCoins(context: Context): Array<Array<Box>> {
     val coins: Array<Array<Box>> =
         Array(8) { row ->
             Array(8) { col ->
@@ -623,13 +672,7 @@ fun ShowGameWonAlert(player: String) {
 
 //Check the movement of a RED coin is valid,
 //this validates the movement to first diagonal box or to the second diagonal box if crossing is possible
-fun isValidRedMove(
-    selectedRow: Int,
-    row: Int,
-    selectedCol: Int,
-    col: Int,
-    coins: Array<Array<Box>>
-): Boolean {
+fun isValidRedMove(selectedRow: Int, row: Int, selectedCol: Int, col: Int, coins: Array<Array<Box>>): Boolean {
     return (selectedCol - 1 == col && selectedRow - 1 == row) ||
             (selectedCol + 1 == col && selectedRow - 1 == row) ||
             (selectedCol - 2 == col && selectedRow - 2 == row && coins[selectedCol - 1][selectedRow - 1].isCoinPresent) ||
@@ -638,13 +681,7 @@ fun isValidRedMove(
 
 //Check the movement of a GREEN coin is valid,
 //this validates the movement to first diagonal box or to the second diagonal box if crossing is possible
-fun isValidGreenMove(
-    selectedRow: Int,
-    row: Int,
-    selectedCol: Int,
-    col: Int,
-    coins: Array<Array<Box>>
-): Boolean {
+fun isValidGreenMove(selectedRow: Int, row: Int, selectedCol: Int, col: Int, coins: Array<Array<Box>>): Boolean {
     return (selectedCol + 1 == col && selectedRow + 1 == row) ||
             (selectedCol - 1 == col && selectedRow + 1 == row) ||
             (selectedCol + 2 == col && selectedRow - 2 == row && coins[selectedCol + 1][selectedRow - 1].isCoinPresent) ||
