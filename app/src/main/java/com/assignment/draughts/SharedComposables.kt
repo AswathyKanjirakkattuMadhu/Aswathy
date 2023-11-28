@@ -58,11 +58,11 @@ fun DraughtsGame() {
 
     val context = LocalContext.current
 
-    val topPlayerColor by remember {
+    var topPlayerColor by remember {
         mutableStateOf(getTopPlayerColor(context))
     }
 
-    val bottomPlayerColor by remember {
+    var bottomPlayerColor by remember {
         mutableStateOf(getBottomPlayerColor(context))
     }
     var currentPlayer by remember {
@@ -375,7 +375,7 @@ fun DraughtsGame() {
             }
         }
         //12 top has been crossed, bottom won the game
-        if (isPlayerEmpty(coins, topPlayerColor)) {
+        if (isPlayerEmpty(coins, topPlayerColor) && crossedReds != 0) {
             crossedGreens = 0
             crossedReds = 0
             var isFinished: Boolean by remember {
@@ -388,6 +388,7 @@ fun DraughtsGame() {
                     Button(onClick = {
                         isFinished = false
                         coins = populateCoins(context)
+
                     }) {
                         Text(text = "Done")
                     }
@@ -397,7 +398,7 @@ fun DraughtsGame() {
             }
         }
         //12 bottom has been crossed, top won the game
-        if (isPlayerEmpty(coins, bottomPlayerColor)) {
+        if (isPlayerEmpty(coins, bottomPlayerColor) && crossedGreens != 0) {
             crossedGreens = 0
             crossedReds = 0
             var isFinished = true
@@ -519,6 +520,9 @@ fun DraughtsGame() {
                                     context
                                 )
                                 coins = populateCoins(context)
+                                currentPlayer = getTopPlayerColor(context)
+                                topPlayerColor = currentPlayer
+                                bottomPlayerColor = getBottomPlayerColor(context)
                             }, modifier = Modifier
                                 .fillMaxWidth()
                                 .height(50.dp)
@@ -653,13 +657,13 @@ fun resetColors(context: Context) {
 
 fun getBottomPlayerColor(context: Context): Color {
     val prefs = context.getSharedPreferences(SETTINGS, MODE_PRIVATE)
-    val colorString = prefs.getString(PLAYER_TOP, "#b0281e")
+    val colorString = prefs.getString(PLAYER_BOTTOM, "#b0281e")
     return Color(android.graphics.Color.parseColor(colorString))
 }
 
 fun getTopPlayerColor(context: Context): Color {
     val prefs = context.getSharedPreferences(SETTINGS, MODE_PRIVATE)
-    val colorString = prefs.getString(PLAYER_BOTTOM, "#1fbfb5")
+    val colorString = prefs.getString(PLAYER_TOP, "#1fbfb5")
     return Color(android.graphics.Color.parseColor(colorString))
 }
 
